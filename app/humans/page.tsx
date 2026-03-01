@@ -126,7 +126,7 @@ export default function HumanPage() {
           if (activeSearch) url += `&search=${encodeURIComponent(activeSearch)}`;
           return fetchAllPages(url);
         })
-      : [fetch(`/api/questions?sort=top&page=1&search=${encodeURIComponent(activeSearch)}`).then((r) => r.json()).then((d) => d.questions || [])];
+      : [fetch(`/api/questions/search?q=${encodeURIComponent(activeSearch)}`).then((r) => r.json()).then((d) => d.questions || [])];
     Promise.all(fetches)
       .then((results) => {
         const seen = new Set<string>();

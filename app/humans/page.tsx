@@ -32,53 +32,49 @@ function HumansContent() {
   }, [viewMode, searchQuery, forumId]);
 
   return (
-    <div>
-      {/* View toggle */}
-      <div className="flex items-center justify-end gap-2 px-4 md:px-6 pt-4">
-        <button
-          onClick={() => setViewMode('list')}
-          className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
-            viewMode === 'list'
-              ? 'bg-[#9945FF]/15 text-[#c4a0ff] border border-[#9945FF]/20'
-              : 'text-[#bbb] hover:text-white hover:bg-[#2e2e55]'
-          }`}
-        >
-          List View
-        </button>
-        <button
-          onClick={() => setViewMode('graph')}
-          className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
-            viewMode === 'graph'
-              ? 'bg-[#14F195]/15 text-[#14F195] border border-[#14F195]/20'
-              : 'text-[#bbb] hover:text-white hover:bg-[#2e2e55]'
-          }`}
-        >
-          Graph View
-        </button>
-      </div>
-
+    <>
       {viewMode === 'list' ? (
         <Suspense fallback={null}>
-          <QuestionList />
+          <div className="relative">
+            {/* View toggle */}
+            <div className="flex items-center justify-end gap-2 px-4 md:px-6 pt-4">
+              <button
+                onClick={() => setViewMode('graph')}
+                className="px-3 py-1.5 text-xs rounded-md text-[#bbb] hover:text-white hover:bg-[#2e2e55] transition-colors"
+              >
+                Graph View
+              </button>
+            </div>
+            <QuestionList />
+          </div>
         </Suspense>
       ) : (
-        <div className="px-4 md:px-6 py-4">
-          <h1 className="text-xl md:text-2xl font-bold text-white mb-4">Knowledge Graph</h1>
-          <p className="text-sm text-[#bbb] mb-4">Click on any node to view the question. Drag nodes to rearrange.</p>
+        <div className="h-full flex flex-col">
           {graphLoading ? (
-            <div className="w-full h-[500px] md:h-[600px] rounded-xl border border-[#363665] bg-[#1a1a35] flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center">
               <div className="text-[#bbb] text-sm">Loading graph...</div>
             </div>
           ) : graphQuestions.length > 0 ? (
-            <QuestionGraph questions={graphQuestions} />
+            <div className="flex-1 relative">
+              <QuestionGraph questions={graphQuestions} />
+              {/* View toggle overlay */}
+              <div className="absolute top-3 right-3 z-10">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className="px-3 py-1.5 text-xs rounded-md bg-black/60 backdrop-blur-sm border border-[#363665] text-[#bbb] hover:text-white hover:bg-[#2e2e55] transition-colors"
+                >
+                  List View
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="w-full h-[500px] rounded-xl border border-[#363665] bg-[#1a1a35] flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center">
               <div className="text-[#bbb] text-sm">No questions found.</div>
             </div>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

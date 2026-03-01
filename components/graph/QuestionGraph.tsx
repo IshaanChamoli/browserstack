@@ -117,23 +117,24 @@ function buildLinks(questions: QuestionData[]): GraphLink[] {
   return links;
 }
 
-// Compute forum gravity centers — evenly spaced in a circle
+// Compute forum gravity centers — evenly spaced in an ellipse matching screen aspect ratio
 function computeForumCenters(forums: string[], w: number, h: number): Record<string, { x: number; y: number }> {
   const centers: Record<string, { x: number; y: number }> = {};
   const cx = w / 2;
   const cy = h / 2;
-  const orbitRadius = Math.min(w, h) * 0.28;
+  const rx = w * 0.28; // horizontal radius — uses width
+  const ry = h * 0.22; // vertical radius — compact vertically
   forums.forEach((forum, i) => {
     const angle = (i / forums.length) * Math.PI * 2 - Math.PI / 2;
     centers[forum] = {
-      x: cx + Math.cos(angle) * orbitRadius,
-      y: cy + Math.sin(angle) * orbitRadius,
+      x: cx + Math.cos(angle) * rx,
+      y: cy + Math.sin(angle) * ry,
     };
   });
   return centers;
 }
 
-export default function QuestionGraph({ questions }: { questions: QuestionData[] }) {
+export default function QuestionGraph({ questions, hideOverlays }: { questions: QuestionData[]; hideOverlays?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -249,7 +250,7 @@ export default function QuestionGraph({ questions }: { questions: QuestionData[]
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           // Same-forum nodes repel less so they stay closer
           const sameForum = nodes[i].forumId === nodes[j].forumId;
-          const repelStrength = sameForum ? 800 : 2500;
+          const repelStrength = sameForum ? 1500 : 4000;
           const force = repelStrength / (dist * dist);
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
@@ -268,7 +269,7 @@ export default function QuestionGraph({ questions }: { questions: QuestionData[]
         const dx = b.x! - a.x!;
         const dy = b.y! - a.y!;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const idealDist = link.type === 'forum' ? 80 : (link.type === 'author' ? 150 : 200);
+        const idealDist = link.type === 'forum' ? 120 : (link.type === 'author' ? 220 : 280);
         const force = (dist - idealDist) * 0.004 * link.strength;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -284,8 +285,8 @@ export default function QuestionGraph({ questions }: { questions: QuestionData[]
         if (center) {
           const dx = center.x - node.x!;
           const dy = center.y - node.y!;
-          node.vx! += dx * 0.003;
-          node.vy! += dy * 0.003;
+          node.vx! += dx * 0.002;
+          node.vy! += dy * 0.002;
         }
         // Weak global center pull to prevent drift
         const gcx = w / 2 - node.x!;
@@ -494,7 +495,7 @@ export default function QuestionGraph({ questions }: { questions: QuestionData[]
   }, [questions]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-[500px] md:h-[600px] rounded-xl border border-[#363665] bg-[#1a1a35] overflow-hidden">
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-[#9945FF]/5 rounded-full blur-[80px]" />
@@ -516,36 +517,41 @@ export default function QuestionGraph({ questions }: { questions: QuestionData[]
         onClick={handleClick}
       />
 
-      {/* Legend */}
-      <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
-        {forumList.map((forum) => (
-          <div key={forum} className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getForumColor(forum) }} />
-            <span className="text-[10px] text-[#bbb]">{forum}</span>
+      {!hideOverlays && (
+        <>
+          {/* Legend */}
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+            {forumList.map((forum) => (
+              <div key={forum} className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getForumColor(forum) }} />
+                <span className="text-[10px] text-[#bbb]">{forum}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Edge type legend */}
-      <div className="absolute bottom-3 right-3 flex flex-col gap-1">
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
-          <div className="w-4 h-px bg-[#9945FF]" />
-          <span className="text-[9px] text-[#bbb]">same forum</span>
-        </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
-          <div className="w-4 h-px border-t border-dashed border-[#14F195]" />
-          <span className="text-[9px] text-[#bbb]">same author</span>
-        </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
-          <div className="w-4 h-px border-t border-dotted border-[#03E1FF]" />
-          <span className="text-[9px] text-[#bbb]">asked near same time</span>
-        </div>
-      </div>
+          {/* Edge type legend */}
+          <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
+              <div className="w-4 h-px bg-[#9945FF]" />
+              <span className="text-[9px] text-[#bbb]">same forum</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
+              <div className="w-4 h-px border-t border-dashed border-[#14F195]" />
+              <span className="text-[9px] text-[#bbb]">same author</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
+              <div className="w-4 h-px border-t border-dotted border-[#03E1FF]" />
+              <span className="text-[9px] text-[#bbb]">asked near same time</span>
+            </div>
+          </div>
 
-      {/* Title overlay */}
-      <div className="absolute top-3 left-3 px-3 py-1.5 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
-        <span className="text-[11px] text-[#bbb] uppercase tracking-wider">Knowledge Graph</span>
-      </div>
+          {/* Title overlay */}
+          <div className="absolute top-3 left-3 px-3 py-1.5 rounded bg-black/60 backdrop-blur-sm border border-[#363665]">
+            <span className="text-sm text-white">browser<span className="font-bold ml-[2px] solana-gradient-text">stack</span></span>
+            <span className="text-[10px] text-[#888] ml-2 uppercase tracking-wider">Knowledge Graph</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

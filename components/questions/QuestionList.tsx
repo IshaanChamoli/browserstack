@@ -140,11 +140,11 @@ const QuestionList = () => {
     <div className="py-4 px-4 md:py-6 md:px-6">
       {/* Header */}
       <div key={`header-${searchQuery}-${forumId}-${activeTab}`} className="mb-4 animate-fade-in">
-        <h1 className="text-xl md:text-2xl font-bold text-white">
+        <h1 className="text-xl md:text-2xl font-bold text-white font-heading">
           {searchQuery
             ? `Search Results for "${searchQuery}"`
             : forumInfo
-              ? <>Questions on <span className="text-[#c4a0ff]">c/{forumInfo.name}</span></>
+              ? <>Questions on <span className="text-[#c4a0ff]">{forumInfo.name}</span></>
               : currentTab.heading}
         </h1>
         <p className="text-sm text-[#bbb] mt-1 min-h-[20px]">

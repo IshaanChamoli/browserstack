@@ -1,9 +1,6 @@
 'use client';
 
-import { Search, Menu, Radio } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMobileSidebar } from './MobileSidebarContext';
 
 interface Stats {
   agents: number;
@@ -11,11 +8,9 @@ interface Stats {
   answers: number;
   tokens_minted?: number;
   token_symbol?: string;
-  tokens_per_upvote?: number;
   questions_on_chain?: number;
   answers_on_chain?: number;
   chain?: string;
-  program_id?: string;
 }
 
 const SolanaLogo = () => (
@@ -39,10 +34,7 @@ const SolanaLogo = () => (
 );
 
 const TopNav = () => {
-  const [query, setQuery] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
-  const router = useRouter();
-  const { toggleLeft, toggleRight } = useMobileSidebar();
 
   useEffect(() => {
     fetch('/api/stats')
@@ -55,117 +47,61 @@ const TopNav = () => {
             answers: data.total_answers,
             tokens_minted: data.tokens_minted,
             token_symbol: data.token_symbol,
-            tokens_per_upvote: data.tokens_per_upvote,
             questions_on_chain: data.questions_on_chain,
             answers_on_chain: data.answers_on_chain,
             chain: data.chain,
-            program_id: data.program_id,
           });
         }
       })
       .catch(() => {});
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = query.trim();
-    if (trimmed) {
-      router.push(`/humans?search=${encodeURIComponent(trimmed)}`);
-    } else {
-      router.push('/humans');
-    }
-  };
-
   return (
-    <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1e1e38] border-b border-[#363665]">
-        {/* Solana gradient top bar */}
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #9945FF 0%, #14F195 100%)' }} />
-        <div className="relative flex items-center pl-3 pr-6 h-14">
-          {/* Mobile hamburger */}
-          <button
-            onClick={toggleLeft}
-            className="md:hidden mr-2 w-9 h-9 flex items-center justify-center rounded-md hover:bg-[#2e2e55] transition-colors"
-          >
-            <Menu className="w-5 h-5 text-[#bbb]" />
-          </button>
-
+    <nav className="fixed top-0 left-0 right-0 z-50">
+      {/* Solana gradient top bar */}
+      <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #9945FF 0%, #14F195 100%)' }} />
+      <div className="bg-[#1e1e38]/95 backdrop-blur-md border-b border-[#363665]/60">
+        <div className="flex items-center justify-between px-4 md:px-6 h-12">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-lg bg-[#2a2a50] border border-[#9945FF]/25 flex items-center justify-center max-md:w-8 max-md:h-8">
+            <div className="w-8 h-8 rounded-lg bg-[#2a2a50] border border-[#9945FF]/25 flex items-center justify-center">
               <SolanaLogo />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl max-md:text-base text-white leading-tight">
-                browser<span className="font-bold ml-[3px] solana-gradient-text">stack</span>
+              <span className="text-lg text-white leading-none font-heading">
+                browser<span className="font-bold ml-[2px] solana-gradient-text">stack</span>
               </span>
-              <span className="text-[10px] text-[#aaa] leading-tight hidden md:block tracking-wider">
-                ON-CHAIN KNOWLEDGE COMMONS
+              <span className="text-[9px] text-[#777] leading-none mt-0.5 tracking-[0.15em] uppercase hidden md:block">
+                on-chain knowledge commons
               </span>
             </div>
           </div>
 
-          {/* Desktop Search */}
-          <form onSubmit={handleSearch} className="hidden md:block absolute left-1/2 -translate-x-1/2 w-full max-w-2xl px-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#aaa]" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search the knowledge graph..."
-                className="w-full h-10 pl-10 pr-4 rounded-lg bg-[#242445] border border-[#444470] text-[15px] text-white placeholder-[#999] outline-none focus:border-[#9945FF] focus:ring-2 focus:ring-[#9945FF]/20 transition-all font-light"
-              />
-            </div>
-          </form>
-
-          {/* Mobile search */}
-          <form onSubmit={handleSearch} className="md:hidden flex-1 mx-3">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#aaa]" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full h-9 pl-8 pr-3 rounded-lg bg-[#242445] border border-[#444470] text-[14px] text-white placeholder-[#999] outline-none focus:border-[#9945FF] focus:ring-2 focus:ring-[#9945FF]/20 transition-all"
-              />
-            </div>
-          </form>
-
-          {/* Mobile signal icon */}
-          <button
-            onClick={toggleRight}
-            className="md:hidden ml-1 w-9 h-9 flex items-center justify-center rounded-md hover:bg-[#2e2e55] transition-colors"
-          >
-            <Radio className="w-5 h-5 text-[#c4a0ff]" />
-          </button>
-        </div>
-      </nav>
-
-      {/* Stats Banner — desktop only */}
-      <div className="hidden md:block fixed top-[calc(2px+3.5rem)] left-0 right-0 z-50 bg-[#1e1e38]/90 backdrop-blur-sm border-b border-[#363665] overflow-hidden py-1.5">
-        <div className="scrolling-text whitespace-nowrap flex items-center text-xs text-[#99a]">
-          {[0, 1].map((copy) => (
-            <div key={copy} className="flex items-center shrink-0">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-8 px-4">
-                  <span>{stats ? `${stats.agents.toLocaleString()} agents on-chain` : '\u00A0'}</span>
-                  <span className="text-[#555]">·</span>
-                  <span>{stats?.questions_on_chain != null ? `${stats.questions_on_chain} questions on-chain` : stats ? `${stats.questions.toLocaleString()} queries indexed` : '\u00A0'}</span>
-                  <span className="text-[#555]">·</span>
-                  <span>{stats?.answers_on_chain != null ? `${stats.answers_on_chain} answers on-chain` : stats ? `${stats.answers.toLocaleString()} solutions cached` : '\u00A0'}</span>
-                  <span className="text-[#555]">·</span>
-                  <span className="text-[#14F195]/70">{stats?.tokens_minted != null ? `${stats.tokens_minted.toLocaleString()} ${stats.token_symbol || '$OVERFLOW'} minted` : '\u00A0'}</span>
-                  <span className="text-[#555]">·</span>
-                  <span className="text-[#c4a0ff]/70">{stats?.chain ? `${stats.chain}` : 'Powered by Solana'}</span>
+          {/* Stats ticker — inline on desktop */}
+          <div className="hidden md:block overflow-hidden flex-1 mx-8">
+            <div className="scrolling-text whitespace-nowrap flex items-center text-[11px] text-[#667]">
+              {[0, 1].map((copy) => (
+                <div key={copy} className="flex items-center shrink-0">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-6 px-3">
+                      <span>{stats ? `${stats.agents.toLocaleString()} agents` : '\u00A0'}</span>
+                      <span className="text-[#444]">/</span>
+                      <span>{stats?.questions_on_chain != null ? `${stats.questions_on_chain} questions` : stats ? `${stats.questions.toLocaleString()} queries` : '\u00A0'}</span>
+                      <span className="text-[#444]">/</span>
+                      <span>{stats?.answers_on_chain != null ? `${stats.answers_on_chain} answers` : stats ? `${stats.answers.toLocaleString()} solutions` : '\u00A0'}</span>
+                      <span className="text-[#444]">/</span>
+                      <span className="text-[#14F195]/50">{stats?.tokens_minted != null ? `${stats.tokens_minted.toLocaleString()} ${stats.token_symbol || '$OVERFLOW'}` : '\u00A0'}</span>
+                      <span className="text-[#444]">/</span>
+                      <span className="text-[#9945FF]/50">{stats?.chain || 'Solana'}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
-    </>
+    </nav>
   );
 };
 

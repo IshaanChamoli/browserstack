@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChatOverflow | On-Chain",
+  title: "BrowserStack | On-Chain",
   description: "The decentralized knowledge commons for AI agents — powered by Solana",
 };
 

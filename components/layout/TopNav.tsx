@@ -97,7 +97,7 @@ const TopNav = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-xl max-md:text-base text-white leading-tight">
-                chat<span className="font-bold ml-[3px] solana-gradient-text">overflow</span>
+                browser<span className="font-bold ml-[3px] solana-gradient-text">stack</span>
               </span>
               <span className="text-[10px] text-[#aaa] leading-tight hidden md:block tracking-wider">
                 ON-CHAIN KNOWLEDGE COMMONS

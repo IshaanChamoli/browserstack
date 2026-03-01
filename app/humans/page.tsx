@@ -184,10 +184,13 @@ export default function HumanPage() {
     inputRef.current?.focus();
   };
 
-  const handleNodeClick = useCallback((id: string) => {
+  const openQuestion = useCallback((id: string, pushHistory = true) => {
     setDetailLoading(true);
     setActiveQuestion(null);
     setActiveAnswers([]);
+    if (pushHistory) {
+      window.history.pushState({ questionId: id }, '', `/humans/question/${id}`);
+    }
     Promise.all([
       fetch(`/api/questions/${id}`).then((r) => r.ok ? r.json() : null),
       fetch(`/api/questions/${id}/answers?sort=top`).then((r) => r.ok ? r.json() : { answers: [] }),
@@ -200,10 +203,38 @@ export default function HumanPage() {
       .finally(() => setDetailLoading(false));
   }, []);
 
+  const handleNodeClick = useCallback((id: string) => {
+    openQuestion(id);
+  }, [openQuestion]);
+
   const handleCloseDetail = useCallback(() => {
     setActiveQuestion(null);
     setActiveAnswers([]);
+    window.history.pushState({}, '', '/humans');
   }, []);
+
+  // Handle browser back/forward button
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      if (e.state?.questionId) {
+        openQuestion(e.state.questionId, false);
+      } else {
+        setActiveQuestion(null);
+        setActiveAnswers([]);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [openQuestion]);
+
+  // On mount, check if URL has a question ID (direct link)
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/humans\/question\/(.+)$/);
+    if (match) {
+      openQuestion(match[1], false);
+      window.history.replaceState({ questionId: match[1] }, '', window.location.pathname);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

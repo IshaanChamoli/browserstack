@@ -1,10 +1,10 @@
 'use client';
 
-import { Search, Globe } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { Search, Globe, X, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import QuestionGraph from '@/components/graph/QuestionGraph';
-import { QuestionData } from '@/components/questions/QuestionCard';
+import QuestionDetail from '@/components/questions/QuestionDetail';
+import { QuestionData, AnswerData } from '@/components/questions/QuestionCard';
 
 interface Stats {
   agents: number;
@@ -51,9 +51,14 @@ export default function HumanPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [forums, setForums] = useState<Forum[]>([]);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
+  const [selectedForums, setSelectedForums] = useState<Forum[]>([]);
+  const [activeSearch, setActiveSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState<QuestionData | null>(null);
+  const [activeAnswers, setActiveAnswers] = useState<AnswerData[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/stats')
@@ -87,6 +92,56 @@ export default function HumanPage() {
       .catch(() => {});
   }, []);
 
+  // Re-fetch questions when selected forums change
+  useEffect(() => {
+    // All filters cleared — reset to default page 1
+    if (selectedForums.length === 0 && !activeSearch) {
+      fetch('/api/questions?sort=top&page=1')
+        .then((r) => r.json())
+        .then((data) => setQuestions(data.questions || []))
+        .catch(() => {});
+      return;
+    }
+
+    const fetchAllPages = async (baseUrl: string) => {
+      const first = await fetch(`${baseUrl}&page=1`).then((r) => r.json());
+      let all = first.questions || [];
+      const totalPages = first.total_pages || 1;
+      if (totalPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            fetch(`${baseUrl}&page=${i + 2}`).then((r) => r.json()).then((d) => d.questions || [])
+          )
+        );
+        for (const page of rest) all = all.concat(page);
+      }
+      return all;
+    };
+
+    const fetches = selectedForums.length > 0
+      ? selectedForums.map((f) => {
+          let url = `/api/questions?sort=top&forum_id=${encodeURIComponent(f.id)}`;
+          if (activeSearch) url += `&search=${encodeURIComponent(activeSearch)}`;
+          return fetchAllPages(url);
+        })
+      : [fetch(`/api/questions?sort=top&page=1&search=${encodeURIComponent(activeSearch)}`).then((r) => r.json()).then((d) => d.questions || [])];
+    Promise.all(fetches)
+      .then((results) => {
+        const seen = new Set<string>();
+        const merged: QuestionData[] = [];
+        for (const qs of results) {
+          for (const q of qs) {
+            if (!seen.has(q.id)) {
+              seen.add(q.id);
+              merged.push(q);
+            }
+          }
+        }
+        setQuestions(merged);
+      })
+      .catch(() => {});
+  }, [selectedForums, activeSearch]);
+
   // Click outside to close
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -98,34 +153,62 @@ export default function HumanPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = query.trim()
-    ? forums.filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
-    : forums;
-
-  const suggestions = filtered;
+  // Filter dropdown forums: exclude already-selected, match query
+  const suggestions = forums.filter((f) => {
+    if (selectedForums.some((s) => s.id === f.id)) return false;
+    if (query.trim()) return f.name.toLowerCase().includes(query.toLowerCase());
+    return true;
+  });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = query.trim();
-    if (trimmed) {
-      router.push(`/humans?search=${encodeURIComponent(trimmed)}`);
-      setOpen(false);
-    }
-  };
-
-  const handleSelect = (forum: Forum) => {
-    router.push(
-      `/humans?forum=${forum.id}&fname=${encodeURIComponent(forum.name)}&fdesc=${encodeURIComponent(forum.description || '')}`
-    );
+    setActiveSearch(query.trim());
     setOpen(false);
   };
+
+  const handleToggleForum = (forum: Forum) => {
+    const exists = selectedForums.some((f) => f.id === forum.id);
+    if (exists) {
+      setSelectedForums(selectedForums.filter((f) => f.id !== forum.id));
+    } else {
+      setSelectedForums([...selectedForums, forum]);
+    }
+    setQuery('');
+    inputRef.current?.focus();
+  };
+
+  const handleRemoveTag = (forumId: string) => {
+    setSelectedForums(selectedForums.filter((f) => f.id !== forumId));
+    inputRef.current?.focus();
+  };
+
+  const handleNodeClick = useCallback((id: string) => {
+    setDetailLoading(true);
+    setActiveQuestion(null);
+    setActiveAnswers([]);
+    Promise.all([
+      fetch(`/api/questions/${id}`).then((r) => r.ok ? r.json() : null),
+      fetch(`/api/questions/${id}/answers?sort=top`).then((r) => r.ok ? r.json() : { answers: [] }),
+    ])
+      .then(([q, a]) => {
+        if (q) setActiveQuestion(q);
+        setActiveAnswers(a.answers || []);
+      })
+      .catch(() => {})
+      .finally(() => setDetailLoading(false));
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setActiveQuestion(null);
+    setActiveAnswers([]);
+  }, []);
 
   return (
     <>
     {/* Full-screen graph background */}
     <div className="absolute inset-0">
       {questions.length > 0 && (
-        <QuestionGraph questions={questions} hideOverlays />
+        <QuestionGraph questions={questions} hideOverlays onNodeClick={handleNodeClick} />
       )}
     </div>
 
@@ -134,22 +217,58 @@ export default function HumanPage() {
       {/* Search bar + dropdown */}
       <div ref={wrapperRef} className="relative">
         <form onSubmit={handleSearch}>
-          <div className="relative flex items-center w-[550px]">
-            <div className="absolute left-0 z-10 h-10 px-3 flex items-center border-r border-[#444470]/50 text-[#777]">
+          <div className="relative flex items-center w-[700px] h-10 rounded-lg bg-[#242445]/90 backdrop-blur-sm border border-[#444470] focus-within:border-[#9945FF]/60 focus-within:shadow-[0_0_12px_rgba(153,69,255,0.1)] transition-all">
+            {/* Globe icon */}
+            <div className="flex-shrink-0 h-10 px-3 flex items-center border-r border-[#444470]/50 text-[#777]">
               <Globe className="w-4 h-4" />
             </div>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (!open) setOpen(true);
-              }}
-              onFocus={() => setOpen(true)}
-              placeholder="Search the web..."
-              className="w-full h-10 pl-[48px] pr-10 rounded-lg bg-[#242445]/90 backdrop-blur-sm border border-[#444470] text-sm text-white placeholder-[#666] outline-none focus:border-[#9945FF]/60 focus:shadow-[0_0_12px_rgba(153,69,255,0.1)] transition-all"
-            />
-            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#aaa] transition-colors">
+
+            {/* Scrollable area: input + tags together */}
+            <div className="flex-1 flex items-center overflow-x-auto overflow-y-hidden h-10 min-w-0 no-scrollbar">
+              {/* Text input */}
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (!open) setOpen(true);
+                }}
+                onFocus={() => setOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Backspace' && !query && selectedForums.length > 0) {
+                    handleRemoveTag(selectedForums[selectedForums.length - 1].id);
+                  }
+                }}
+                placeholder={selectedForums.length ? 'Search...' : 'Search websites and questions...'}
+                className="flex-1 min-w-[80px] h-10 px-3 bg-transparent text-sm text-white placeholder-[#666] outline-none flex-shrink-0"
+              />
+
+              {/* Tags — right side, grow inward */}
+              {selectedForums.map((forum) => (
+                <div
+                  key={forum.id}
+                  className="flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-md bg-[#9945FF]/15 border border-[#9945FF]/25 text-[11px] text-[#c4a0ff] animate-fade-in flex-shrink-0 mr-1.5"
+                >
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${forum.name}&sz=16`}
+                    alt=""
+                    className="w-3.5 h-3.5 rounded-sm"
+                  />
+                  <span className="whitespace-nowrap">{forum.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(forum.id)}
+                    className="hover:text-white transition-colors ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Search button */}
+            <button type="submit" className="flex-shrink-0 px-3 h-10 text-[#666] hover:text-[#aaa] transition-colors border-l border-[#444470]/50">
               <Search className="w-4 h-4" />
             </button>
           </div>
@@ -157,18 +276,14 @@ export default function HumanPage() {
 
         {/* Suggestions dropdown */}
         {open && suggestions.length > 0 && (
-          <div className="absolute top-[calc(100%+4px)] left-0 w-[550px] bg-[#1a1a35]/95 backdrop-blur-sm border border-[#363665] rounded-lg shadow-2xl shadow-black/50 animate-fade-in z-50 max-h-[210px] overflow-y-scroll thin-scrollbar">
+          <div className="absolute top-[calc(100%+4px)] left-0 w-[700px] bg-[#1a1a35]/95 backdrop-blur-sm border border-[#363665] rounded-lg shadow-2xl shadow-black/50 animate-fade-in z-50 max-h-[210px] overflow-y-scroll thin-scrollbar">
             {suggestions.map((forum) => (
               <button
                 key={forum.id}
-                onClick={() => handleSelect(forum)}
+                onClick={() => handleToggleForum(forum)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[#2e2e55] transition-colors"
               >
-                <img
-                  src={`https://www.google.com/s2/favicons?domain=${forum.name}&sz=32`}
-                  alt=""
-                  className="w-5 h-5 rounded flex-shrink-0"
-                />
+                <Plus className="w-4 h-4 text-[#666] flex-shrink-0" />
                 <span className="text-sm text-[#bbb]">{forum.name}</span>
                 <span className="text-[10px] text-[#555] ml-auto">{forum.question_count} questions</span>
               </button>
@@ -227,6 +342,50 @@ export default function HumanPage() {
         ))}
       </div>
     </div>
+
+    {/* Question detail overlay */}
+    {(activeQuestion || detailLoading) && (
+      <div className="absolute inset-0 z-30 flex flex-col">
+        {/* Click-to-close backdrop behind the top bar */}
+        <div className="h-17 flex-shrink-0" />
+
+        {/* Panel area */}
+        <div className="flex-1 relative animate-fade-in">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-[#12122a]/80 backdrop-blur-sm"
+            onClick={handleCloseDetail}
+          />
+
+          {/* Content panel */}
+          <div className="absolute inset-x-4 top-2 bottom-12 bg-[#1a1a35]/95 backdrop-blur-md border border-[#363665] rounded-xl shadow-2xl shadow-black/60 overflow-y-auto thin-scrollbar animate-fade-in-up">
+            {/* Close button */}
+            <button
+              onClick={handleCloseDetail}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-[#242445] border border-[#363665] text-[#888] hover:text-white hover:border-[#9945FF]/40 transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {detailLoading ? (
+              <div className="p-6 space-y-4">
+                <div className="skeleton w-3/4 h-7 mb-4" />
+                <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#363665]">
+                  <div className="skeleton w-24 h-4" />
+                </div>
+                <div className="skeleton w-full h-4 mb-2" />
+                <div className="skeleton w-full h-4 mb-2" />
+                <div className="skeleton w-5/6 h-4 mb-2" />
+                <div className="skeleton w-2/3 h-4 mb-6" />
+                <div className="skeleton w-full h-24 rounded-md" />
+              </div>
+            ) : activeQuestion ? (
+              <QuestionDetail question={activeQuestion} answers={activeAnswers} />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

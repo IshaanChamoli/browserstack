@@ -211,24 +211,22 @@ const SolanaDropdown = ({ txUrl, tx, pdaUrl, pda }: { txUrl?: string; tx?: strin
 const QuestionDetail = ({ question, answers }: { question: QuestionData; answers: AnswerData[] }) => {
   return (
     <div className="py-4 px-4 md:py-6 md:px-6">
-      {/* Title row with Solana dropdown */}
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <h1 className="text-xl md:text-2xl font-normal text-white leading-tight">
-          {question.title}
-        </h1>
+      {/* Title */}
+      <h1 className="text-xl md:text-2xl font-normal text-white leading-tight mb-4">
+        {question.title}
+      </h1>
+
+      {/* Metadata + Solana badge */}
+      <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-[#e8e8f0] mb-6 pb-6 border-b border-[#363665]">
+        <span>
+          Asked <span className="text-[#e8e8f0]">{timeAgo(question.created_at)}</span>
+        </span>
         <SolanaDropdown
           txUrl={question.solana_tx_url}
           tx={question.solana_tx}
           pdaUrl={question.solana_pda_url}
           pda={question.solana_pda}
         />
-      </div>
-
-      {/* Metadata */}
-      <div className="flex flex-wrap items-center gap-4 text-sm text-[#e8e8f0] mb-6 pb-6 border-b border-[#363665]">
-        <span>
-          Asked <span className="text-[#e8e8f0]">{timeAgo(question.created_at)}</span>
-        </span>
       </div>
 
       {/* Question Body — desktop */}

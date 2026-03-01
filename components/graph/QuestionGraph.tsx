@@ -117,24 +117,37 @@ function buildLinks(questions: QuestionData[]): GraphLink[] {
   return links;
 }
 
-// Compute forum gravity centers — evenly spaced in an ellipse matching screen aspect ratio
+// Compute forum gravity centers — adapts layout to forum count
 function computeForumCenters(forums: string[], w: number, h: number): Record<string, { x: number; y: number }> {
   const centers: Record<string, { x: number; y: number }> = {};
-  const cx = w / 2;
+  const cx = w / 2 + w * 0.08;
   const cy = h / 2;
-  const rx = w * 0.28; // horizontal radius — uses width
-  const ry = h * 0.22; // vertical radius — compact vertically
-  forums.forEach((forum, i) => {
-    const angle = (i / forums.length) * Math.PI * 2 - Math.PI / 2;
-    centers[forum] = {
-      x: cx + Math.cos(angle) * rx,
-      y: cy + Math.sin(angle) * ry,
-    };
-  });
+  const n = forums.length;
+
+  if (n === 1) {
+    // Single forum — center everything
+    centers[forums[0]] = { x: cx, y: cy };
+  } else if (n === 2) {
+    // Two forums — spread horizontally
+    centers[forums[0]] = { x: cx - w * 0.15, y: cy };
+    centers[forums[1]] = { x: cx + w * 0.15, y: cy };
+  } else {
+    // 3+ forums — ellipse, scale radius with count
+    const scale = Math.min(1, n / 6); // smaller orbit when fewer forums
+    const rx = w * 0.28 * scale;
+    const ry = h * 0.22 * scale;
+    forums.forEach((forum, i) => {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      centers[forum] = {
+        x: cx + Math.cos(angle) * rx,
+        y: cy + Math.sin(angle) * ry,
+      };
+    });
+  }
   return centers;
 }
 
-export default function QuestionGraph({ questions, hideOverlays }: { questions: QuestionData[]; hideOverlays?: boolean }) {
+export default function QuestionGraph({ questions, hideOverlays, onNodeClick }: { questions: QuestionData[]; hideOverlays?: boolean; onNodeClick?: (id: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -242,6 +255,10 @@ export default function QuestionGraph({ questions, hideOverlays }: { questions: 
       const h = dimensions.height;
       const centers = forumCentersRef.current;
 
+      // Scale repulsion down when fewer nodes to prevent them flying apart
+      const nodeCount = nodes.length;
+      const repelScale = nodeCount < 10 ? 0.4 : (nodeCount < 20 ? 0.7 : 1);
+
       // Node-node repulsion
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
@@ -250,7 +267,7 @@ export default function QuestionGraph({ questions, hideOverlays }: { questions: 
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           // Same-forum nodes repel less so they stay closer
           const sameForum = nodes[i].forumId === nodes[j].forumId;
-          const repelStrength = sameForum ? 1500 : 4000;
+          const repelStrength = (sameForum ? 1500 : 4000) * repelScale;
           const force = repelStrength / (dist * dist);
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
@@ -289,7 +306,7 @@ export default function QuestionGraph({ questions, hideOverlays }: { questions: 
           node.vy! += dy * 0.002;
         }
         // Weak global center pull to prevent drift
-        const gcx = w / 2 - node.x!;
+        const gcx = (w / 2 + w * 0.08) - node.x!;
         const gcy = h / 2 - node.y!;
         node.vx! += gcx * 0.0003;
         node.vy! += gcy * 0.0003;
@@ -343,15 +360,20 @@ export default function QuestionGraph({ questions, hideOverlays }: { questions: 
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Animated particles — different speeds per type
-        const baseSpeed = link.type === 'forum' ? 100 : (link.type === 'author' ? 80 : 140);
-        const speed = isHighlighted ? 40 : baseSpeed;
+        // Barely-visible ambient glow drifting along the link
+        const baseSpeed = link.type === 'forum' ? 600 : (link.type === 'author' ? 500 : 700);
+        const speed = isHighlighted ? 200 : baseSpeed;
         const t = (tick % speed) / speed;
         const px = a.x! + (b.x! - a.x!) * t;
         const py = a.y! + (b.y! - a.y!) * t;
+        const glowR = isHighlighted ? 10 : 12;
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, glowR);
+        grad.addColorStop(0, isHighlighted ? 'rgba(20, 241, 149, 0.18)' : style.particle + '08');
+        grad.addColorStop(0.5, isHighlighted ? 'rgba(20, 241, 149, 0.06)' : style.particle + '03');
+        grad.addColorStop(1, 'transparent');
         ctx.beginPath();
-        ctx.arc(px, py, isHighlighted ? 2.5 : 1.2, 0, Math.PI * 2);
-        ctx.fillStyle = isHighlighted ? '#14F195' : style.particle + '66';
+        ctx.arc(px, py, glowR, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
         ctx.fill();
       }
 
@@ -477,7 +499,11 @@ export default function QuestionGraph({ questions, hideOverlays }: { questions: 
     const y = e.clientY - rect.top;
     const found = findNode(x, y);
     if (found) {
-      router.push(`/humans/question/${found.id}`);
+      if (onNodeClick) {
+        onNodeClick(found.id);
+      } else {
+        router.push(`/humans/question/${found.id}`);
+      }
     }
   }, [findNode, router]);
 

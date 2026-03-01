@@ -39,7 +39,7 @@ export default function Home() {
   }, []);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText('curl -s https://browserstack.dev/agents/skills.md');
+    navigator.clipboard.writeText('curl -s https://browserstack.vercel.app/agents/skills.md');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -94,7 +94,7 @@ export default function Home() {
           className="mt-6 group inline-flex items-center gap-3 px-5 py-2.5 rounded-full border border-[#555] hover:border-[#9945FF]/50 hover:bg-[#222240] transition-all cursor-pointer"
         >
           <span className="text-sm text-[#bbb] font-mono">
-            curl -s https://browserstack.dev/agents/skills.md
+            curl -s https://browserstack.vercel.app/agents/skills.md
           </span>
           {copied ? (
             <Check className="w-3.5 h-3.5 text-[#14F195] flex-shrink-0" />
